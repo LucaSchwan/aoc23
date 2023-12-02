@@ -69,7 +69,7 @@ async fn main() {
             )
             .await
             {
-                println!("Input file saved as {day}.input.")
+                println!("Input file saved as '{day}.input'.")
             } else {
                 eprintln! {"Error downloading input file for day{day}."}
             }
