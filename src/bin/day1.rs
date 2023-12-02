@@ -3,7 +3,7 @@ use anyhow::Result;
 fn sum_nums(nums: Vec<String>) -> Result<u32> {
     Ok(nums
         .into_iter()
-        .map(|line| line.chars().filter(|c| c.is_digit(10)).collect())
+        .map(|line| line.chars().filter(|c| c.is_ascii_digit()).collect())
         .map(|line: String| {
             format!(
                 "{}{}",
