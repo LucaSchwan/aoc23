@@ -1,14 +1,17 @@
 run DAY:
-  nix-shell --run "cargo run --bin day{{DAY}}"
+  cargo watch -x "run --bin day{{DAY}}"
 
 test DAY:
-  nix-shell --run "cargo test --bin day{{DAY}}"
+  cargo watch -x "test --bin day{{DAY}}"
 
 build_aoc:
-  nix-shell --run "cargo build --bin aoc23"
+  cargo build --bin aoc23
 
 run_aoc: build_aoc
   ./target/debug/aoc23
+
+load DAY: build_aoc
+  ./target/debug/aoc23 load {{DAY}}
 
 docs:
   rustup docs --std
