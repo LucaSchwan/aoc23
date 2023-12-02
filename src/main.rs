@@ -62,12 +62,13 @@ async fn main() {
 
     match args.subcommand {
         Subcommand::Load { day } => {
-            if let Ok(_) = fetch_url(
+            if (fetch_url(
                 format!("https://adventofcode.com/2023/day/{day}/input"),
                 format!("data/{day}.input"),
                 cookie.into(),
             )
-            .await
+            .await)
+                .is_ok()
             {
                 println!("Input file saved as '{day}.input'.")
             } else {
