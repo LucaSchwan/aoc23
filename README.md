@@ -1,16 +1,15 @@
 # AOC 2023
 
-By default the aoc23 bin is run, it produces this usage:
+These are my solutions for Advent of Code 2023.
+
+This project uses `just`. Look at the recipes by running `just --list`.
+
+The `aoc23` binary can show a simple usage as well as download the input files.
 
 ```
-These are my solutions for aoc 2023.
-Each day is it's own binary so you can run it using:
-  cargo run --bin day[1-25]
+cargo run --bin aoc23 usage
+```
 
-Each day also has tests using the examples.
-These can be run using:
-  cargo test
-
-Or a single day with:
-  cargo test --bin day[1-25]
+```
+cargo run --bin aoc23 load [Number of day]
 ```
