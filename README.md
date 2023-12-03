@@ -13,3 +13,7 @@ cargo run --bin aoc23 usage
 ```
 cargo run --bin aoc23 load [Number of day]
 ```
+
+If you are running NixOS, the shell.nix includes extra dependencies for building
+`openssl` used by the `reqwest` crate. Note: you still need rust installed in your
+system, I haven't come around to having shells be purely every dependency you need.
