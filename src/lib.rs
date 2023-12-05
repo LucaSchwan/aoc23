@@ -10,3 +10,7 @@ where
         .filter_map(|line| line.parse::<T>().ok())
         .collect())
 }
+
+pub fn load_input(path: &str) -> Result<String> {
+    Ok(std::fs::read_to_string(path)?)
+}
