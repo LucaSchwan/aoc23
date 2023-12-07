@@ -1,5 +1,3 @@
-use std::iter::zip;
-
 use anyhow::Result;
 use nom::{
     character::complete,
@@ -9,6 +7,7 @@ use nom::{
     IResult, Parser,
 };
 use nom_supreme::{tag::complete::tag, ParserExt};
+use std::iter::zip;
 
 #[derive(Debug)]
 struct Race {
