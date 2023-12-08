@@ -8,27 +8,6 @@ struct NodeChildren {
     right: String,
 }
 
-#[derive(Debug, Clone)]
-struct Directions {
-    directions: String,
-    index: usize,
-}
-
-impl Iterator for Directions {
-    type Item = char;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index > self.directions.len() - 1 {
-            self.index = 0;
-        }
-
-        let c = self.directions.chars().nth(self.index);
-        self.index += 1;
-
-        c
-    }
-}
-
 fn parse_map(input: &str) -> Result<BTreeMap<String, NodeChildren>> {
     Ok(input.lines().fold(BTreeMap::new(), |mut map, line| {
         let (node, children) = line
@@ -54,10 +33,7 @@ fn part1(path: &str) -> Result<u32> {
 
     let map = parse_map(map)?;
 
-    let mut directions = Directions {
-        directions: directions.to_string(),
-        index: 0,
-    };
+    let mut directions = directions.chars().cycle();
     let mut steps = 0;
     let mut current = "AAA".to_string();
 
@@ -84,15 +60,12 @@ fn part2(path: &str) -> Result<u64> {
 
     let map = parse_map(map)?;
 
-    let mut directions = Directions {
-        directions: directions.to_string(),
-        index: 0,
-    };
+    let mut directions = directions.chars().cycle();
 
     let currents = map
         .clone()
         .into_keys()
-        .filter(|key| key.ends_with('A'))
+        .filter(|key| key.ends_with("A"))
         .collect::<Vec<String>>();
 
     let steps = currents
@@ -101,7 +74,7 @@ fn part2(path: &str) -> Result<u64> {
         .map(|current| {
             let mut current = current;
             let mut steps = 0;
-            while current.ends_with('Z') {
+            while !current.ends_with("Z") {
                 steps += 1;
                 let current_children = map.get(&current).expect("Should exist");
                 let next_direction = directions.next().expect("Should exist");
@@ -111,7 +84,6 @@ fn part2(path: &str) -> Result<u64> {
                     _ => panic!("Wrong direction"),
                 };
             }
-            directions.index = 0;
             steps
         })
         .collect::<Vec<u64>>();
