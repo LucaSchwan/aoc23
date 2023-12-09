@@ -12,7 +12,6 @@ fn build_tree(history: Vec<i32>) -> Vec<Vec<i32>> {
         .all(|value| *value == 0)
     {
         let new_values = values_tree
-            .clone()
             .iter()
             .last()
             .expect("Should have a last")
