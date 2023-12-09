@@ -32,8 +32,8 @@ fn calc_extrapolate_forwards(history: Vec<i32>) -> i32 {
     values_tree.iter_mut().for_each(|values| values.reverse());
     values_tree.reverse();
 
-    values_tree.iter().skip(1).fold(0, |value, history| {
-        value + *history.first().expect("Should have first")
+    values_tree.into_iter().skip(1).fold(0, |value, history| {
+        value + history.first().expect("Should have first")
     })
 }
 
@@ -42,8 +42,8 @@ fn calc_extrapolate_backwards(history: Vec<i32>) -> i32 {
 
     values_tree.reverse();
 
-    values_tree.iter().skip(1).fold(0, |value, values| {
-        *values.first().expect("Should have first") - value
+    values_tree.into_iter().skip(1).fold(0, |value, values| {
+        values.first().expect("Should have first") - value
     })
 }
 
