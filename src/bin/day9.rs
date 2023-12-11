@@ -50,19 +50,13 @@ fn calc_extrapolate_backwards(history: Vec<i32>) -> i32 {
 fn part1(path: &str) -> Result<i32> {
     let histories = aoc23::read_lines_of_num::<i32>(path)?;
 
-    Ok(histories
-        .into_iter()
-        .map(|history| calc_extrapolate_forwards(history))
-        .sum())
+    Ok(histories.into_iter().map(calc_extrapolate_forwards).sum())
 }
 
 fn part2(path: &str) -> Result<i32> {
     let histories = aoc23::read_lines_of_num::<i32>(path)?;
 
-    Ok(histories
-        .into_iter()
-        .map(|history| calc_extrapolate_backwards(history))
-        .sum())
+    Ok(histories.into_iter().map(calc_extrapolate_backwards).sum())
 }
 
 fn main() {
