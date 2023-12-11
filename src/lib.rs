@@ -16,14 +16,14 @@ pub fn load_input(path: &str) -> Result<String> {
     Ok(std::fs::read_to_string(path)?)
 }
 
-pub fn read_lines_of_num<T>(path: &str) -> Result<Vec<Vec<T>>>
+pub fn read_lines_of_num<T>(path: &str, delim: &str) -> Result<Vec<Vec<T>>>
 where
     T: Integer + FromStr,
 {
     Ok(std::fs::read_to_string(path)?
         .lines()
         .map(|line| {
-            line.split(" ")
+            line.split(delim)
                 .filter_map(|value| value.parse::<T>().ok())
                 .collect()
         })
