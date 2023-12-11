@@ -4,6 +4,12 @@ run DAY:
 test DAY:
   cargo watch -x "test --bin day{{DAY}}"
 
+clippy_watch:
+  cargo watch -s "./clippy_dirty"
+
+clippy:
+  ./clippy_dirty
+
 build_aoc:
   cargo build --bin aoc23
 
