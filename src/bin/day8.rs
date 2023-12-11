@@ -65,7 +65,7 @@ fn part2(path: &str) -> Result<u64> {
     let currents = map
         .clone()
         .into_keys()
-        .filter(|key| key.ends_with("A"))
+        .filter(|key| key.ends_with('A'))
         .collect::<Vec<String>>();
 
     let steps = currents
@@ -74,7 +74,7 @@ fn part2(path: &str) -> Result<u64> {
         .map(|current| {
             let mut current = current;
             let mut steps = 0;
-            while !current.ends_with("Z") {
+            while !current.ends_with('Z') {
                 steps += 1;
                 let current_children = map.get(&current).expect("Should exist");
                 let next_direction = directions.next().expect("Should exist");
