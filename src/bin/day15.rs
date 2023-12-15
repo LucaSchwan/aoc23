@@ -49,10 +49,7 @@ fn lens(input: &str) -> IResult<&str, Lens> {
 }
 
 fn parse_lenses(input: &str) -> IResult<&str, Vec<Lens>> {
-    let (input, lenses) = separated_list1(tag(","), lens)(input)?;
-    let (input, _) = tag(",")(input)?;
-
-    debug_assert!(input.is_empty());
+    let (input, lenses) = separated_list1(alt((tag(","), tag("\n"))), lens)(input)?;
 
     Ok((input, lenses))
 }
@@ -101,7 +98,6 @@ fn arrange_lenses(lenses: Vec<Lens>) -> BTreeMap<u32, Vec<(&str, u32)>> {
 
 fn part2(path: &str) -> Result<u32> {
     let input = aoc23::load_input(path)?;
-    let input = input.replace('\n', ",");
 
     let (_, lenses) = parse_lenses(input.as_str()).expect("Should parse");
     let boxes = arrange_lenses(lenses);
