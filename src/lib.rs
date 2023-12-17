@@ -2,6 +2,7 @@ use anyhow::Result;
 use num::Integer;
 use std::{
     self,
+    fmt::Display,
     ops::{Add, Sub},
     str::FromStr,
 };
@@ -38,6 +39,12 @@ where
 pub struct Vec2D {
     pub x: i32,
     pub y: i32,
+}
+
+impl Display for Vec2D {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.x, self.y)
+    }
 }
 
 impl Vec2D {
