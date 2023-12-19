@@ -1,10 +1,10 @@
 use anyhow::Result;
 
-fn part1(path: &str) -> Result<u32> {
+fn part1(_path: &str) -> Result<u32> {
     todo!()
 }
 
-fn part2(path: &str) -> Result<u32> {
+fn part2(_path: &str) -> Result<u32> {
     todo!()
 }
 
