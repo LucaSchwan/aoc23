@@ -79,19 +79,19 @@ fn step_once_infinite_grid(
                 let mut check_pos = new_pos;
 
                 if check_pos.x > garden_x {
-                    check_pos.x = 0;
+                    check_pos.x %= garden_x;
                 }
 
                 if check_pos.y > garden_y {
-                    check_pos.y = 0;
+                    check_pos.y %= garden_y;
                 }
 
                 if check_pos.x < 0 {
-                    check_pos.x = garden_x;
+                    check_pos.x = check_pos.x.abs() % garden_x;
                 }
 
                 if check_pos.y < 0 {
-                    check_pos.y = garden_y;
+                    check_pos.y = check_pos.y.abs() % garden_y;
                 }
 
                 if let Some(Position::Rocks) = garden.get(&check_pos) {
@@ -144,23 +144,38 @@ fn calc_xs_ys(path: &str) -> Result<Vec<(usize, usize)>> {
 
     interpolation.push((65 + 131 * 2, poss.len()));
 
+    for _ in 0..131 {
+        poss = step_once_infinite_grid(garden.clone(), garden_x, garden_y, poss);
+    }
+
+    interpolation.push((65 + 131 * 3, poss.len()));
+
     Ok(interpolation)
 }
 
-fn part2(path: &str, steps: usize) -> Result<usize> {
-    let (_, ys): (Vec<_>, Vec<_>) = calc_xs_ys(path)?.into_iter().unzip();
+fn part2(path: &str, steps: usize) -> Result<f64> {
+    // let (_, ys): (Vec<_>, Vec<_>) = calc_xs_ys(path)?.into_iter().unzip();
+    //
+    // println!(
+    //     "{{{{{}, {}}}, {{{}, {}}}, {{{}, {}}}, {{{}, {}}}}}",
+    //     0, ys[0], 1, ys[1], 2, ys[2], 3, ys[3]
+    // );
+    //
+    // let first_diff1 = ys[1] - ys[0];
+    // let first_diff2 = ys[2] - ys[1];
+    // let second_diff = first_diff2 - first_diff1;
+    //
+    // let a = second_diff / 2;
+    // let b = first_diff1 - 3 * a;
+    // let c = ys[0] - b - a;
+    //
+    // let poly = |n: usize| a * n.pow(2) + b * n + c;
 
-    let first_diff1 = ys[1] - ys[0];
-    let first_diff2 = ys[2] - ys[1];
-    let second_diff = first_diff2 - first_diff1;
+    let x = steps as f64 - 65.0 / 131.0;
+    //3712.3 + 15097.3 x + 14706.5 x^2
+    let result = 3712.3 + 15097.3 * x + 14706.5 * x.powf(2.0);
 
-    let a = second_diff / 2;
-    let b = first_diff1 - 3 * a;
-    let c = ys[0] - b - a;
-
-    let poly = |n: usize| a * n.pow(2) + b * n + c;
-
-    Ok(poly(steps / 131))
+    Ok(result)
 }
 
 fn main() {
