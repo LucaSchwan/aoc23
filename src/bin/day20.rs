@@ -1,284 +1,308 @@
 use anyhow::Result;
+use itertools::Itertools;
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{alpha1, line_ending},
+    multi::separated_list1,
+    IResult,
+};
+use num::integer::lcm;
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Debug;
 
-fn name_to_id(name: String) -> usize {
-    let mut id = 0;
-    for (exp, byte) in name.bytes().enumerate() {
-        id += (byte as usize) * 256_usize.pow(exp as u32);
-    }
-    id
+#[derive(Debug, Clone, Copy)]
+enum Pulse {
+    High,
+    Low,
 }
 
-const HIGH: bool = true;
-const LOW: bool = false;
-
-#[derive(Debug)]
-struct Pulse {
-    from: usize,
-    to: usize,
-    pulse_type: bool,
+#[derive(Debug, Clone)]
+enum ModuleType<'a> {
+    Broadcaster,
+    FlipFlop { state: Pulse },
+    Conjuction { memory: HashMap<&'a str, Pulse> },
 }
 
-#[derive(Debug)]
-struct PulseQueue {
-    queue: VecDeque<Pulse>,
-    low_count: usize,
-    high_count: usize,
-    button_count: usize,
+type From = String;
+type To = String;
+
+#[derive(Debug, Clone)]
+struct Module<'a> {
+    id: &'a str,
+    output: Vec<&'a str>,
+    module_type: ModuleType<'a>,
 }
 
-impl PulseQueue {
-    fn new() -> Self {
-        Self {
-            queue: VecDeque::new(),
-            low_count: 0,
-            high_count: 0,
-            button_count: 0,
-        }
-    }
-
-    fn send(&mut self, from: usize, pulse_type: bool, targets: &[usize]) {
-        targets.iter().for_each(move |target| {
-            match pulse_type {
-                HIGH => self.high_count += 1,
-                LOW => self.low_count += 1,
-            }
-
-            self.queue.push_back(Pulse {
-                from,
-                pulse_type,
-                to: *target,
-            })
-        })
-    }
-
-    fn push_button(&mut self, modules: &mut ModulesGraph) {
-        self.low_count += 1;
-        self.button_count += 1;
-        self.queue.push_back(Pulse {
-            from: 0,
-            to: 0,
-            pulse_type: LOW,
-        });
-
-        while let Some(pulse) = self.queue.pop_front() {
-            if let Some(module) = modules.get_mut(&pulse.to) {
-                module.receive(pulse, self);
-            }
-        }
-    }
-}
-
-type ModulesGraph = HashMap<usize, Box<dyn Module>>;
-
-trait Module {
-    fn receive(&mut self, pulse: Pulse, pulse_queue: &mut PulseQueue);
-    fn flip_flop_state(&self) -> Option<bool>;
-    fn get_nexts(&self) -> Vec<usize>;
-    fn get_id(&self) -> usize;
-}
-
-impl Debug for dyn Module {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Module: {:?}, Nexts: {:?}",
-            self.get_id(),
-            self.get_nexts()
-        )
-    }
-}
-
-#[derive(Debug)]
-struct FlipFlop {
-    id: usize,
-    state: bool,
-    nexts: Vec<usize>,
-}
-
-impl FlipFlop {
-    fn new(id: usize, nexts: Vec<usize>) -> Self {
-        Self {
-            id,
-            state: LOW,
-            nexts,
-        }
-    }
-}
-
-impl Module for FlipFlop {
-    fn receive(&mut self, pulse: Pulse, pulse_queue: &mut PulseQueue) {
-        if matches!(pulse.pulse_type, LOW) {
-            self.state = !self.state;
-
-            pulse_queue.send(self.id, self.state, &self.nexts)
-        }
-    }
-
-    fn flip_flop_state(&self) -> Option<bool> {
-        Some(self.state)
-    }
-
-    fn get_nexts(&self) -> Vec<usize> {
-        self.nexts.clone()
-    }
-
-    fn get_id(&self) -> usize {
-        self.id
-    }
-}
-
-#[derive(Debug)]
-struct Conjuction {
-    id: usize,
-    inputs: HashMap<usize, bool>,
-    nexts: Vec<usize>,
-}
-
-impl Conjuction {
-    fn new(id: usize, input_names: Vec<usize>, nexts: Vec<usize>) -> Self {
-        let mut inputs = HashMap::new();
-
-        input_names.into_iter().for_each(|name| {
-            inputs.insert(name, LOW);
-        });
-
-        Self { id, inputs, nexts }
-    }
-}
-
-impl Module for Conjuction {
-    fn receive(&mut self, pulse: Pulse, pulse_queue: &mut PulseQueue) {
-        self.inputs
-            .entry(pulse.from)
-            .and_modify(|i| *i = pulse.pulse_type);
-
-        if self.inputs.iter().all(|(_, pulse)| *pulse) {
-            pulse_queue.send(self.id, LOW, &self.nexts)
-        } else {
-            pulse_queue.send(self.id, HIGH, &self.nexts)
-        }
-    }
-
-    fn flip_flop_state(&self) -> Option<bool> {
-        None
-    }
-
-    fn get_nexts(&self) -> Vec<usize> {
-        self.nexts.clone()
-    }
-
-    fn get_id(&self) -> usize {
-        self.id
-    }
-}
-
-#[derive(Debug)]
-struct Broadcast {
-    id: usize,
-    nexts: Vec<usize>,
-}
-
-impl Broadcast {
-    fn new(id: usize, nexts: Vec<usize>) -> Self {
-        Self { id, nexts }
-    }
-}
-
-impl Module for Broadcast {
-    fn receive(&mut self, pulse: Pulse, pulse_queue: &mut PulseQueue) {
-        pulse_queue.send(self.id, pulse.pulse_type, &self.nexts);
-    }
-
-    fn flip_flop_state(&self) -> Option<bool> {
-        None
-    }
-
-    fn get_nexts(&self) -> Vec<usize> {
-        self.nexts.clone()
-    }
-
-    fn get_id(&self) -> usize {
-        self.id
-    }
-}
-
-fn parse_graph(connections: Vec<String>) -> ModulesGraph {
-    connections
-        .into_iter()
-        .fold(HashMap::new(), |mut graph, conn| {
-            let (name, next) = conn.split_once(" -> ").expect("Should be well formed");
-
-            let name = name.to_string();
-            let next = next
-                .split(", ")
-                .map(|s| name_to_id(s.to_string()))
-                .collect();
-
-            match name.chars().next().expect("Should have first character") {
-                'b' => graph.insert(0, Box::new(Broadcast::new(0, next))),
-                '%' => {
-                    let id = name_to_id(name.chars().skip(1).collect());
-                    graph.insert(id, Box::new(FlipFlop::new(id, next)))
-                }
-                '&' => {
-                    let id = name_to_id(name.chars().skip(1).collect());
-                    let inputs = graph
+impl<'a> Module<'a> {
+    fn process(&mut self, sender_id: From, pulse: &Pulse) -> Vec<(From, To, Pulse)> {
+        match &mut self.module_type {
+            ModuleType::Broadcaster => self
+                .output
+                .iter()
+                .map(|&id| (self.id.to_string(), id.to_string(), *pulse))
+                .collect::<Vec<(From, To, Pulse)>>(),
+            ModuleType::FlipFlop { state } => match (pulse, &state) {
+                (Pulse::High, _) => vec![],
+                (Pulse::Low, Pulse::High) => {
+                    *state = Pulse::Low;
+                    self.output
                         .iter()
-                        .filter(|(_, node)| node.get_nexts().contains(&id))
-                        .map(|(id, _)| *id)
-                        .collect::<Vec<usize>>();
-                    graph.insert(id, Box::new(Conjuction::new(id, inputs, next)))
+                        .map(|&id| (self.id.to_string(), id.to_string(), Pulse::Low))
+                        .collect::<Vec<(From, To, Pulse)>>()
                 }
-                _ => unreachable!(),
-            };
-            graph
+                (Pulse::Low, Pulse::Low) => {
+                    *state = Pulse::High;
+                    self.output
+                        .iter()
+                        .map(|&id| (self.id.to_string(), id.to_string(), Pulse::High))
+                        .collect::<Vec<(From, To, Pulse)>>()
+                }
+            },
+            ModuleType::Conjuction { memory } => {
+                *memory.get_mut(sender_id.as_str()).expect("Should exist") = *pulse;
+                let new_pulse = if memory.values().all(|value| matches!(value, Pulse::High)) {
+                    Pulse::Low
+                } else {
+                    Pulse::High
+                };
+                self.output
+                    .iter()
+                    .map(|&id| (self.id.to_string(), id.to_string(), new_pulse))
+                    .collect::<Vec<(From, To, Pulse)>>()
+            }
+        }
+    }
+}
+
+fn broadcaster(input: &str) -> IResult<&str, Module> {
+    let (input, _) = tag("broadcaster -> ")(input)?;
+    let (input, outputs) = separated_list1(tag(", "), alpha1)(input)?;
+    Ok((
+        input,
+        Module {
+            id: "broadcaster",
+            output: outputs,
+            module_type: ModuleType::Broadcaster,
+        },
+    ))
+}
+
+fn flip_flop(input: &str) -> IResult<&str, Module> {
+    let (input, _) = tag("%")(input)?;
+    let (input, name) = alpha1(input)?;
+    let (input, _) = tag(" -> ")(input)?;
+    let (input, outputs) = separated_list1(tag(", "), alpha1)(input)?;
+    Ok((
+        input,
+        Module {
+            id: name,
+            output: outputs,
+            module_type: ModuleType::FlipFlop { state: Pulse::Low },
+        },
+    ))
+}
+
+fn conjuction(input: &str) -> IResult<&str, Module> {
+    let (input, _) = tag("&")(input)?;
+    let (input, name) = alpha1(input)?;
+    let (input, _) = tag(" -> ")(input)?;
+    let (input, outputs) = separated_list1(tag(", "), alpha1)(input)?;
+    Ok((
+        input,
+        Module {
+            id: name,
+            output: outputs,
+            module_type: ModuleType::Conjuction {
+                memory: HashMap::new(),
+            },
+        },
+    ))
+}
+
+fn parse(input: &str) -> IResult<&str, HashMap<&str, Module>> {
+    let (input, modules) =
+        separated_list1(line_ending, alt((broadcaster, flip_flop, conjuction)))(input)?;
+
+    Ok((
+        input,
+        modules
+            .into_iter()
+            .map(|module| (module.id, module))
+            .collect(),
+    ))
+}
+
+fn add_inputs<'a>(mut modules: HashMap<&'a str, Module<'a>>) -> HashMap<&'a str, Module<'a>> {
+    let conjuctions = modules
+        .iter()
+        .filter_map(|(id, module)| match &module.module_type {
+            ModuleType::Broadcaster => None,
+            ModuleType::FlipFlop { .. } => None,
+            ModuleType::Conjuction { .. } => Some(*id),
         })
+        .collect::<Vec<&str>>();
+
+    let inputs = modules.iter().fold(
+        HashMap::<&str, Vec<&str>>::new(),
+        |mut acc, (id, module)| {
+            for c in conjuctions.iter() {
+                if module.output.contains(c) {
+                    acc.entry(c)
+                        .and_modify(|item| item.push(id))
+                        .or_insert(vec![id]);
+                }
+            }
+            acc
+        },
+    );
+
+    inputs.into_iter().for_each(|(con, input_modules)| {
+        modules.entry(con).and_modify(|module| {
+            let ModuleType::Conjuction { memory, .. } = &mut module.module_type else {
+                unreachable!("Has to be a conjuction");
+            };
+            *memory = input_modules
+                .into_iter()
+                .map(|id| (id, Pulse::Low))
+                .collect();
+        });
+    });
+
+    modules
 }
 
 fn part1(path: &str) -> Result<usize> {
-    let input = aoc23::read_one_per_line::<String>(path)?;
+    let input = aoc23::load_input(path)?;
+    let (_input, modules) = parse(&input).expect("Should parse");
+    let mut modules = add_inputs(modules);
 
-    let mut graph = parse_graph(input);
-
-    let mut pulse_queue = PulseQueue::new();
-    let mut pulse_counts = vec![(0, 0)];
-
+    let mut button_presses = 0;
+    let mut cycle_pulses = vec![];
     loop {
-        pulse_queue.push_button(&mut graph);
-        pulse_counts.push((pulse_queue.high_count, pulse_queue.low_count));
+        button_presses += 1;
+        let mut pulses = (0, 1);
+        let mut inbox = VecDeque::<(From, To, Pulse)>::from([(
+            "button".to_string(),
+            "broadcaster".to_string(),
+            Pulse::Low,
+        )]);
+        while let Some((from, to, pulse)) = inbox.pop_front() {
+            let outputs = modules
+                .get_mut(to.as_str())
+                .map(|m| m.process(from.clone(), &pulse))
+                .unwrap_or_default();
+            for (_, _, pulse) in outputs.iter() {
+                match pulse {
+                    Pulse::High => pulses.0 += 1,
+                    Pulse::Low => pulses.1 += 1,
+                }
+            }
 
-        if graph
+            inbox.extend(outputs);
+        }
+
+        cycle_pulses.push(pulses);
+
+        if modules
             .iter()
-            .filter_map(|(_, module)| module.flip_flop_state())
-            .all(|state| !state)
-            || pulse_queue.button_count == 1000
+            .filter(|(_, module)| {
+                if let ModuleType::FlipFlop { state } = &module.module_type {
+                    matches!(state, Pulse::High)
+                } else {
+                    false
+                }
+            })
+            .collect_vec()
+            .is_empty()
+            || button_presses == 1000
         {
             break;
         }
     }
 
-    let (cycle_highs, cycle_lows): (Vec<_>, Vec<_>) = pulse_counts.clone().into_iter().unzip();
+    let (highs, lows): (Vec<usize>, Vec<usize>) = cycle_pulses.into_iter().unzip();
+    let high_sums = highs.clone().into_iter().sum::<usize>();
+    let low_sums = lows.clone().into_iter().sum::<usize>();
 
-    dbg!(&pulse_queue);
+    let cycles = 1000 / button_presses;
+    let left_presses = 1000 % button_presses;
 
-    let high = (1000 / pulse_queue.button_count) * pulse_queue.high_count
-        + cycle_highs[1000 % pulse_queue.button_count];
-    let low = (1000 / pulse_queue.button_count) * pulse_queue.low_count
-        + cycle_lows[1000 % pulse_queue.button_count];
+    let left_highs = highs.into_iter().take(left_presses).sum::<usize>();
+    let left_lows = lows.into_iter().take(left_presses).sum::<usize>();
 
-    Ok(high * low)
+    let highs_full = high_sums * cycles + left_highs;
+    let lows_full = low_sums * cycles + left_lows;
+
+    Ok(highs_full * lows_full)
 }
 
-fn part2(_path: &str) -> Result<u32> {
-    todo!()
+fn part2(path: &str) -> Result<usize> {
+    let input = aoc23::load_input(path)?;
+    let (_input, modules) = parse(&input).expect("Should parse");
+    let mut modules = add_inputs(modules);
+
+    // This is a conjuction
+
+    let check_modules = modules.clone();
+
+    let rx_input = check_modules
+        .values()
+        .find(|module| module.output.contains(&"rx"))
+        .expect("Should exist");
+
+    let mut input_inputs = check_modules
+        .values()
+        .filter_map(|module| {
+            if module.output.contains(&rx_input.id) {
+                Some(module.id)
+            } else {
+                None
+            }
+        })
+        .collect_vec();
+
+    let mut lcms = vec![];
+    for i in 0.. {
+        if lcms.len() == 4 {
+            break;
+        }
+
+        let mut inbox = VecDeque::<(From, To, Pulse)>::from([(
+            "button".to_string(),
+            "broadcaster".to_string(),
+            Pulse::Low,
+        )]);
+        while let Some((from, to, pulse)) = inbox.pop_front() {
+            if input_inputs.contains(&to.as_str()) && matches!(pulse, Pulse::Low) {
+                let index = input_inputs
+                    .iter()
+                    .position(|x| x == &to)
+                    .expect("Should exist");
+
+                input_inputs.remove(index);
+
+                lcms.push(i + 1)
+            }
+            let outputs = modules
+                .get_mut(to.as_str())
+                .map(|m| m.process(from.clone(), &pulse))
+                .unwrap_or_default();
+
+            inbox.extend(outputs);
+        }
+    }
+
+    let mut result = 1;
+    lcms.into_iter().for_each(|presses| {
+        result = lcm(result, presses);
+    });
+
+    Ok(result)
 }
 
 fn main() {
     println!("Part1: {}", part1("data/20.input").unwrap());
-    todo!();
-    println!("Part1: {}", part2("data/x.input").unwrap());
+    println!("Part2: {}", part2("data/20.input").unwrap());
 }
 
 #[cfg(test)]
@@ -292,8 +316,5 @@ mod test {
         assert_eq!(part1(path).unwrap(), result);
     }
 
-    // #[test]
-    // fn part2_test() {
-    //     assert_eq!(part2("data/x.sample").unwrap(), 0);
-    // }
+    // No test for part 2 :(
 }
