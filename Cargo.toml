@@ -19,6 +19,7 @@ nom-supreme = "0.8.0"
 test-case = "3.3.1"
 num = "0.4.1"
 cached = "0.46.1"
+glam = "0.25.0"
 
 [[bin]]
 name = "day1"
