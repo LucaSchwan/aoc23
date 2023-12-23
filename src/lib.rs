@@ -43,7 +43,7 @@ pub struct Vec2D {
 
 impl Display for Vec2D {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.x, self.y)
+        write!(f, "{},{}", self.x, self.y)
     }
 }
 
